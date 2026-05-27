@@ -1,0 +1,36 @@
+.godot/
+.superpowers/
+build/
+
+# Android / Gradle
+**/.gradle/
+**/.kotlin/
+**/build/
+**/local.properties
+**/*.apk
+**/*.aab
+**/*.ap_
+**/*.dex
+**/*.class
+**/*.jks
+**/*.keystore
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Codex/local generated workspace state
+.agents/
+.codex-work/
+adb-devopts/
+*.png
+*.jpg
+*.jpeg
+tmp-*
+current-screen*
+phone-status*
+installed-apps.txt
+adb-uninstall-report*.txt
+AnytimeJournalAndroid/window-*.xml
