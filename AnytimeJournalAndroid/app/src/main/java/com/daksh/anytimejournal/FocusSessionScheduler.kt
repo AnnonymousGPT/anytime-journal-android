@@ -20,6 +20,8 @@ object FocusSessionScheduler {
     private const val CHANNEL_ID = "anytime_focus_sessions_v2"
     const val ACTION_SAVE_UNLOCK_INTENT = "com.daksh.anytimejournal.SAVE_UNLOCK_INTENT"
     private const val ACTION_FOCUS_REMINDER = "com.daksh.anytimejournal.FOCUS_REMINDER"
+    private const val ACTION_FOCUS_COMPLETE = "com.daksh.anytimejournal.FOCUS_COMPLETE"
+    private const val ACTION_FOCUS_EXTEND = "com.daksh.anytimejournal.FOCUS_EXTEND"
     const val KEY_FOCUS_PURPOSE = "focus_purpose"
     private const val EXTRA_DURATION_MINUTES = "duration_minutes"
     private const val EXTRA_PURPOSE = "purpose"
@@ -30,7 +32,10 @@ object FocusSessionScheduler {
     fun showUnlockPrompt(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
         createChannel(manager)
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
+            action = MainActivity.ACTION_OPEN_FOCUS
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
         val contentIntent = PendingIntent.getActivity(
             context,
             PROMPT_NOTIFICATION_ID,
@@ -67,7 +72,7 @@ object FocusSessionScheduler {
         val now = System.currentTimeMillis()
         val dueAtMillis = now + minutes * 60_000L
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val requestCode = requestCode(now, cleanPurpose)
+        val requestCode = requestCode(dueAtMillis, cleanPurpose)
         val intent = Intent(context, FocusSessionReceiver::class.java).apply {
             action = ACTION_FOCUS_REMINDER
             putExtra(EXTRA_PURPOSE, cleanPurpose)
@@ -100,6 +105,22 @@ object FocusSessionScheduler {
                 val dueAtMillis = intent.getLongExtra(EXTRA_DUE_AT, System.currentTimeMillis())
                 showDueFocus(context, purpose, dueAtMillis)
                 saveFocusDue(context, purpose)
+            }
+            ACTION_FOCUS_COMPLETE -> {
+                val purpose = intent.getStringExtra(EXTRA_PURPOSE).orEmpty()
+                val dueAtMillis = intent.getLongExtra(EXTRA_DUE_AT, System.currentTimeMillis())
+                context.getSystemService(NotificationManager::class.java)
+                    .cancel(focusNotificationId(dueAtMillis, purpose))
+                saveFocusComplete(context, purpose)
+            }
+            ACTION_FOCUS_EXTEND -> {
+                val purpose = intent.getStringExtra(EXTRA_PURPOSE).orEmpty()
+                val dueAtMillis = intent.getLongExtra(EXTRA_DUE_AT, System.currentTimeMillis())
+                val minutes = intent.getIntExtra(EXTRA_DURATION_MINUTES, 10)
+                context.getSystemService(NotificationManager::class.java)
+                    .cancel(focusNotificationId(dueAtMillis, purpose))
+                scheduleFocusReminder(context, purpose, minutes)
+                saveFocusExtend(context, purpose, minutes)
             }
         }
     }
@@ -164,10 +185,10 @@ object FocusSessionScheduler {
         val manager = context.getSystemService(NotificationManager::class.java)
         createChannel(manager)
         manager.notify(
-            REMINDER_NOTIFICATION_BASE_ID + requestCode(dueAtMillis, purpose).and(0x0fff),
+            focusNotificationId(dueAtMillis, purpose),
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_journal_notification)
-                .setContentTitle("Task kya tha?")
+                .setContentTitle("Time up")
                 .setContentText(EntryUiFormatter.compactPreview(purpose, 90))
                 .setWhen(dueAtMillis)
                 .setShowWhen(true)
@@ -175,6 +196,11 @@ object FocusSessionScheduler {
                 .setVisibility(Notification.VISIBILITY_PRIVATE)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setContentIntent(openFocusIntent(context, purpose))
+                .addAction(focusAction(context, "Complete", ACTION_FOCUS_COMPLETE, purpose, dueAtMillis))
+                .addAction(R.drawable.ic_journal_notification, "Edit", openFocusIntent(context, purpose))
+                .addAction(focusAction(context, "+10m", ACTION_FOCUS_EXTEND, purpose, dueAtMillis, 10))
+                .addAction(focusAction(context, "+30m", ACTION_FOCUS_EXTEND, purpose, dueAtMillis, 30))
                 .setGroup(NotificationHelper.GROUP_KEY)
                 .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
                 .setSortKey("1_focus_due_$dueAtMillis")
@@ -187,8 +213,8 @@ object FocusSessionScheduler {
         if (purpose.isBlank()) return
         CoroutineScope(Dispatchers.IO).launch {
             EntryRepository.from(context).saveReply(
-                "Focus start: $purpose #task #focus ${minutes}m",
-                kind = JournalEntryInput.KIND_JOURNAL,
+                "Started: $purpose - ${minutes}m #activity",
+                kind = JournalEntryInput.KIND_FOCUS,
             )
         }
     }
@@ -197,10 +223,68 @@ object FocusSessionScheduler {
         if (purpose.isBlank()) return
         CoroutineScope(Dispatchers.IO).launch {
             EntryRepository.from(context).saveReply(
-                "Focus check: $purpose #journal #focus",
-                kind = JournalEntryInput.KIND_JOURNAL,
+                "Time up: $purpose #activity",
+                kind = JournalEntryInput.KIND_FOCUS,
             )
         }
+    }
+
+    private fun saveFocusComplete(context: Context, purpose: String) {
+        if (purpose.isBlank()) return
+        CoroutineScope(Dispatchers.IO).launch {
+            EntryRepository.from(context).saveReply(
+                "Completed: $purpose #activity #done",
+                kind = JournalEntryInput.KIND_FOCUS,
+            )
+        }
+    }
+
+    private fun saveFocusExtend(context: Context, purpose: String, minutes: Int) {
+        if (purpose.isBlank()) return
+        CoroutineScope(Dispatchers.IO).launch {
+            EntryRepository.from(context).saveReply(
+                "Extended: $purpose +${minutes}m #activity",
+                kind = JournalEntryInput.KIND_FOCUS,
+            )
+        }
+    }
+
+    private fun focusAction(
+        context: Context,
+        label: String,
+        action: String,
+        purpose: String,
+        dueAtMillis: Long,
+        minutes: Int = 0,
+    ): NotificationCompat.Action {
+        val intent = Intent(context, FocusSessionReceiver::class.java).apply {
+            this.action = action
+            putExtra(EXTRA_PURPOSE, purpose)
+            putExtra(EXTRA_DUE_AT, dueAtMillis)
+            putExtra(EXTRA_DURATION_MINUTES, minutes)
+        }
+        val requestCode = requestCode(dueAtMillis + minutes, "$action|$purpose")
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        return NotificationCompat.Action.Builder(R.drawable.ic_journal_notification, label, pendingIntent).build()
+    }
+
+    private fun openFocusIntent(context: Context, purpose: String = ""): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            action = MainActivity.ACTION_OPEN_FOCUS
+            putExtra(MainActivity.EXTRA_FOCUS_PREFILL, purpose)
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        return PendingIntent.getActivity(
+            context,
+            4255,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun createChannel(manager: NotificationManager) {
@@ -227,6 +311,10 @@ object FocusSessionScheduler {
 
     private fun requestCode(seed: Long, purpose: String): Int {
         return (seed xor purpose.hashCode().toLong()).toInt().and(0x0fffffff)
+    }
+
+    private fun focusNotificationId(dueAtMillis: Long, purpose: String): Int {
+        return REMINDER_NOTIFICATION_BASE_ID + requestCode(dueAtMillis, purpose).and(0x0fff)
     }
 }
 

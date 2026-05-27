@@ -28,6 +28,7 @@ object CaptureController {
                 state.selectedEntryTimeMillis > nowMillis -> "Schedule"
             EntryKindNormalizer.normalize(state.selectedKind) == JournalEntryInput.KIND_COLLAB -> "Send"
             EntryKindNormalizer.normalize(state.selectedKind) == JournalEntryInput.KIND_TASK -> "Add task"
+            EntryKindNormalizer.normalize(state.selectedKind) == JournalEntryInput.KIND_FOCUS -> "Log activity"
             EntryKindNormalizer.normalize(state.selectedKind) == JournalEntryInput.KIND_IDEA -> "Save idea"
             else -> "Post"
         }
@@ -46,6 +47,7 @@ object CaptureController {
         return when (EntryKindNormalizer.normalize(kind)) {
             JournalEntryInput.KIND_IDEA -> "Spark, link, priority..."
             JournalEntryInput.KIND_TASK -> "Task, checklist, due..."
+            JournalEntryInput.KIND_FOCUS -> "Activity, intent, outcome..."
             JournalEntryInput.KIND_COLLAB -> "Message ${activeChatPeer.removePrefix("@")}..."
             JournalEntryInput.KIND_JOURNAL -> "Log mood, moment, thought..."
             else -> "Add ${EntryUiFormatter.kindLabel(kind).lowercase()} item..."

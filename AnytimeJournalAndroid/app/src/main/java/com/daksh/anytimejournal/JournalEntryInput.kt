@@ -17,6 +17,7 @@ object JournalEntryInput {
     const val KIND_JOURNAL = "journal"
     const val KIND_IDEA = "idea"
     const val KIND_TASK = "task"
+    const val KIND_FOCUS = "focus"
     const val KIND_COLLAB = "collab"
     const val DEFAULT_TASK_REMINDER_MS = 10 * 60 * 1000L
 }

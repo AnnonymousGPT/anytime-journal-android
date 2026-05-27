@@ -6,6 +6,7 @@ object EntryUiFormatter {
         return when (normalized) {
             JournalEntryInput.KIND_IDEA -> "Idea"
             JournalEntryInput.KIND_TASK -> "Task"
+            JournalEntryInput.KIND_FOCUS -> "Activity"
             JournalEntryInput.KIND_COLLAB -> "Collab"
             JournalEntryInput.KIND_JOURNAL, "" -> "Journal"
             else -> normalized.replaceFirstChar { it.titlecase() }
@@ -16,6 +17,7 @@ object EntryUiFormatter {
         return when (val normalized = kind.trim().lowercase()) {
             JournalEntryInput.KIND_IDEA -> "#idea"
             JournalEntryInput.KIND_TASK -> "#task"
+            JournalEntryInput.KIND_FOCUS -> "#activity"
             JournalEntryInput.KIND_COLLAB -> "#collab"
             JournalEntryInput.KIND_JOURNAL, "" -> "#journal"
             else -> "#$normalized"

@@ -1977,6 +1977,7 @@ class MainActivity : Activity() {
                 JournalEntryInput.KIND_JOURNAL -> "Search journal or #tag"
                 JournalEntryInput.KIND_IDEA -> "Search ideas, links, sparks"
                 JournalEntryInput.KIND_TASK -> "Search tasks or #due"
+                JournalEntryInput.KIND_FOCUS -> "Search activity or #done"
                 JournalEntryInput.KIND_COLLAB -> "Search chat"
                 else -> "Search all screens"
             }
@@ -2045,6 +2046,7 @@ class MainActivity : Activity() {
             JournalEntryInput.KIND_JOURNAL,
             JournalEntryInput.KIND_IDEA,
             JournalEntryInput.KIND_TASK,
+            JournalEntryInput.KIND_FOCUS,
             JournalEntryInput.KIND_COLLAB,
         )
         val entryKinds = allEntries.map { it.kind }
@@ -2379,6 +2381,11 @@ class MainActivity : Activity() {
                 Color.rgb(252, 238, 216),
                 Color.rgb(240, 248, 241),
             )
+            JournalEntryInput.KIND_FOCUS -> intArrayOf(
+                Color.rgb(232, 249, 250),
+                Color.rgb(220, 242, 244),
+                Color.rgb(247, 246, 255),
+            )
             JournalEntryInput.KIND_COLLAB -> intArrayOf(
                 Color.rgb(246, 241, 255),
                 Color.rgb(237, 231, 252),
@@ -2428,6 +2435,7 @@ class MainActivity : Activity() {
         return when (normalizeKind(kind)) {
             JournalEntryInput.KIND_IDEA -> COLOR_ACCENT_BLUE
             JournalEntryInput.KIND_TASK -> COLOR_ACCENT_AMBER
+            JournalEntryInput.KIND_FOCUS -> COLOR_ACCENT_TEAL
             JournalEntryInput.KIND_COLLAB -> COLOR_OBSIDIAN
             JournalEntryInput.KIND_JOURNAL -> COLOR_ACCENT_GREEN
             else -> COLOR_OBSIDIAN
@@ -2438,6 +2446,7 @@ class MainActivity : Activity() {
         return when (normalizeKind(kind)) {
             JournalEntryInput.KIND_IDEA -> COLOR_TINT_BLUE
             JournalEntryInput.KIND_TASK -> COLOR_TINT_AMBER
+            JournalEntryInput.KIND_FOCUS -> COLOR_TINT_TEAL
             JournalEntryInput.KIND_COLLAB -> COLOR_TINT_OBSIDIAN
             JournalEntryInput.KIND_JOURNAL -> COLOR_TINT_GREEN
             else -> COLOR_TINT_OBSIDIAN
@@ -2460,8 +2469,28 @@ class MainActivity : Activity() {
             saveCloudConfig(config.projectUrl, config.anonKey)
         }
         if (intent?.getBooleanExtra(EXTRA_OPEN_COLLAB, false) != true &&
-            intent?.action != ACTION_OPEN_COLLAB
+            intent?.action != ACTION_OPEN_COLLAB &&
+            intent?.action != ACTION_OPEN_FOCUS
         ) {
+            return
+        }
+        if (intent?.action == ACTION_OPEN_FOCUS) {
+            selectedKind = JournalEntryInput.KIND_FOCUS
+            activeFilter = JournalEntryInput.KIND_FOCUS
+            collabAssignTaskMode = false
+            collabSendLaterMode = false
+            resetSelectedEntryTime()
+            renderKindSelector()
+            renderFilterSelector()
+            applyCaptureTheme(animate = false)
+            renderEntries()
+            val prefill = intent.getStringExtra(EXTRA_FOCUS_PREFILL).orEmpty()
+            if (prefill.isNotBlank()) {
+                quickInput.setText(prefill)
+                quickInput.setSelection(quickInput.text.length)
+            }
+            quickInput.requestFocus()
+            showKeyboard(quickInput)
             return
         }
         if (intent?.getBooleanExtra(EXTRA_ACCEPT_CALL, false) == true && ::voiceCallManager.isInitialized) {
@@ -2693,10 +2722,12 @@ class MainActivity : Activity() {
 
     companion object {
         const val ACTION_OPEN_COLLAB = "com.daksh.anytimejournal.OPEN_COLLAB"
+        const val ACTION_OPEN_FOCUS = "com.daksh.anytimejournal.OPEN_FOCUS"
         const val EXTRA_OPEN_COLLAB = "open_collab"
         const val EXTRA_PROFILE = "profile"
         const val EXTRA_ACCEPT_CALL = "accept_call"
         const val EXTRA_START_CALL = "start_call"
+        const val EXTRA_FOCUS_PREFILL = "focus_prefill"
         const val EXTRA_CLOUD_URL = "cloud_url"
         const val EXTRA_CLOUD_ANON_KEY = "cloud_anon_key"
         private const val REQUEST_NOTIFICATIONS = 10
@@ -2725,10 +2756,12 @@ class MainActivity : Activity() {
         private val COLOR_ACCENT_GREEN = Color.rgb(44, 132, 102)
         private val COLOR_ACCENT_BLUE = Color.rgb(81, 103, 190)
         private val COLOR_ACCENT_AMBER = Color.rgb(174, 105, 31)
+        private val COLOR_ACCENT_TEAL = Color.rgb(38, 126, 138)
         private val COLOR_OBSIDIAN = Color.rgb(105, 78, 160)
         private val COLOR_TINT_GREEN = Color.rgb(226, 244, 238)
         private val COLOR_TINT_BLUE = Color.rgb(232, 237, 255)
         private val COLOR_TINT_AMBER = Color.rgb(252, 238, 216)
+        private val COLOR_TINT_TEAL = Color.rgb(220, 242, 244)
         private val COLOR_TINT_OBSIDIAN = Color.rgb(239, 233, 252)
     }
 }

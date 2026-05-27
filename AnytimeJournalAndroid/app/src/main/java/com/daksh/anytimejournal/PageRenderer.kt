@@ -9,6 +9,7 @@ object PageRenderer {
         JournalEntryInput.KIND_JOURNAL,
         JournalEntryInput.KIND_IDEA,
         JournalEntryInput.KIND_TASK,
+        JournalEntryInput.KIND_FOCUS,
         JournalEntryInput.KIND_COLLAB,
     )
 
@@ -25,6 +26,7 @@ object PageRenderer {
             JournalEntryInput.KIND_JOURNAL -> PageConfig("Journal", "Timeline for logs, tags, reminders, ideas, and mentions", COLOR_ACCENT_GREEN)
             JournalEntryInput.KIND_IDEA -> PageConfig("Ideas", "Compact spark board for links, priorities, and raw concepts", COLOR_ACCENT_BLUE)
             JournalEntryInput.KIND_TASK -> PageConfig("Tasks", "Fast checklist lane with due time and reminders", COLOR_ACCENT_AMBER)
+            JournalEntryInput.KIND_FOCUS -> PageConfig("Activity", "Unlock intent, active timers, time-up checks, and completed focus sessions", COLOR_ACCENT_TEAL)
             JournalEntryInput.KIND_COLLAB -> PageConfig("Collab chat", "Live chat, online users, calls, typing, and shared notes", COLOR_OBSIDIAN)
             else -> PageConfig(EntryUiFormatter.kindLabel(normalized), "Custom tagged entries live inside All", COLOR_OBSIDIAN)
         }
@@ -45,10 +47,12 @@ object PageRenderer {
         JournalEntryInput.KIND_JOURNAL,
         JournalEntryInput.KIND_IDEA,
         JournalEntryInput.KIND_TASK,
+        JournalEntryInput.KIND_FOCUS,
     )
 
     private val COLOR_ACCENT_GREEN = Color.rgb(44, 132, 102)
     private val COLOR_ACCENT_BLUE = Color.rgb(81, 103, 190)
     private val COLOR_ACCENT_AMBER = Color.rgb(174, 105, 31)
+    private val COLOR_ACCENT_TEAL = Color.rgb(38, 126, 138)
     private val COLOR_OBSIDIAN = Color.rgb(105, 78, 160)
 }
