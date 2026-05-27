@@ -12,7 +12,7 @@ import androidx.core.app.RemoteInput
 
 object NotificationHelper {
     const val CHANNEL_ID = "anytime_journal_input_silent_v2"
-    private const val SERVICE_CHANNEL_ID = "anytime_journal_service_silent_v2"
+    private const val SERVICE_CHANNEL_ID = "anytime_journal_service_hidden_v3"
     private const val LEGACY_INPUT_CHANNEL_ID = "anytime_journal_input"
     private const val MENTION_CHANNEL_ID = "anytime_journal_mentions"
     private const val CALL_CHANNEL_ID = "anytime_journal_calls"
@@ -37,18 +37,18 @@ object NotificationHelper {
         return NotificationCompat.Builder(context, SERVICE_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_journal_notification)
             .setContentTitle("Anytime Journal")
-            .setContentText("Bubble and live sync active")
+            .setContentText("")
             .setOngoing(true)
             .setShowWhen(false)
             .setSilent(true)
             .setOnlyAlertOnce(true)
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(Notification.VISIBILITY_SECRET)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setContentIntent(contentIntent)
             .setGroup(GROUP_KEY)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
-            .setSortKey("0_service")
+            .setSortKey("9_service")
             .build()
     }
 
@@ -162,14 +162,14 @@ object NotificationHelper {
         cleanupLegacySilentChannels(manager)
         val channel = NotificationChannel(
             SERVICE_CHANNEL_ID,
-            "Anytime Journal Service",
-            NotificationManager.IMPORTANCE_LOW,
+            "Anytime Journal Background",
+            NotificationManager.IMPORTANCE_MIN,
         ).apply {
-            description = "Silent background service for bubble and live collab"
+            description = "Minimal background service for bubble and live collab"
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)
-            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            lockscreenVisibility = Notification.VISIBILITY_SECRET
         }
         manager.createNotificationChannel(channel)
     }
