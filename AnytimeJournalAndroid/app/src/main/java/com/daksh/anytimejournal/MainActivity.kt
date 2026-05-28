@@ -1224,14 +1224,15 @@ class MainActivity : Activity() {
         val peerName = activeChatPeer.removePrefix("@")
         val online = isPeerOnline(activeChatPeer)
         val callState = if (::voiceCallManager.isInitialized) voiceCallManager.state() else lastCallState
-        collabPeerText.text = when {
-            callState?.micLive == true -> "Voice live"
-            callState?.hasIncomingAudio == true -> "Incoming voice"
-            callState?.active == true -> "Listening"
-            isRemoteTypingVisible() -> "$peerName typing"
-            online -> "Online"
-            else -> "Offline"
+        val status = when {
+            callState?.micLive == true -> "voice live"
+            callState?.hasIncomingAudio == true -> "incoming voice"
+            callState?.active == true -> "listening"
+            isRemoteTypingVisible() -> "typing"
+            online -> "online"
+            else -> lastActiveLabel(activeChatPeer)
         }
+        collabPeerText.text = "@$peerName - $status"
         collabStatusText.visibility = View.GONE
         collabPeerText.setTextColor(if (online || callState?.active == true || isRemoteTypingVisible()) COLOR_ACCENT_GREEN else COLOR_OBSIDIAN)
     }
@@ -2577,12 +2578,14 @@ class MainActivity : Activity() {
         content.addView(userManagementSection("Live now", activeUsers, online = true))
         val offlineUsers = users.filterNot { activeUsers.any { active -> active.equals(it, ignoreCase = true) } }
         content.addView(userManagementSection("Recent offline", offlineUsers, online = false))
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle("User management")
             .setView(content)
             .setNegativeButton("Change me") { _, _ -> showProfileDialog(force = true) }
             .setPositiveButton("Done", null)
-            .show()
+            .create()
+        attachUserRowOpenHandlers(content, dialog)
+        dialog.show()
     }
 
     private fun userManagementSection(title: String, users: List<String>, online: Boolean): View {
@@ -2614,6 +2617,7 @@ class MainActivity : Activity() {
 
     private fun userManagementRow(profile: String, online: Boolean): View {
         val row = LinearLayout(this).apply {
+            tag = profile
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(9), dp(7), dp(9), dp(7))
@@ -2651,6 +2655,20 @@ class MainActivity : Activity() {
             setTextColor(if (online) COLOR_ACCENT_GREEN else COLOR_MUTED)
         })
         return row
+    }
+
+    private fun attachUserRowOpenHandlers(root: View, dialog: AlertDialog) {
+        if (root is ViewGroup) {
+            for (index in 0 until root.childCount) {
+                attachUserRowOpenHandlers(root.getChildAt(index), dialog)
+            }
+        }
+        val profile = root.tag as? String ?: return
+        if (!profile.startsWith("@") || profile.equals(activeCollabUser, ignoreCase = true)) return
+        root.setOnClickListener {
+            dialog.dismiss()
+            selectCollabPeer(profile)
+        }
     }
 
     private fun lastActiveLabel(profile: String): String {
