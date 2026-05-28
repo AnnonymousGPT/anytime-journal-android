@@ -476,8 +476,8 @@ class CollabSyncManager(
 
     private fun pollCloudPresence(): List<CollabPresence> {
         val config = cloudConfig() ?: return emptyList()
-        val cutoff = System.currentTimeMillis() - PRESENCE_ONLINE_WINDOW_MS
-        val query = "select=source_id,profile,last_seen_millis&last_seen_millis=gt.$cutoff"
+        val cutoff = System.currentTimeMillis() - PRESENCE_RECENT_WINDOW_MS
+        val query = "select=source_id,profile,last_seen_millis&last_seen_millis=gt.$cutoff&order=last_seen_millis.desc&limit=50"
         val response = runCatching {
             val connection = (URL("${config.restUrl}/collab_presence?$query").openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
@@ -601,7 +601,7 @@ class CollabSyncManager(
         private const val PRESENCE_POST_MS = 15_000L
         private const val RELAY_TIMEOUT_MS = 900
         private const val CLOUD_TIMEOUT_MS = 1500
-        private const val PRESENCE_ONLINE_WINDOW_MS = 45_000L
+        private const val PRESENCE_RECENT_WINDOW_MS = 24 * 60 * 60 * 1000L
     }
 }
 

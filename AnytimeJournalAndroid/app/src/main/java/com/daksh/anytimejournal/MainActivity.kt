@@ -96,6 +96,7 @@ class MainActivity : Activity() {
     private var allEntries: List<EntryEntity> = emptyList()
     private var profiles: List<ProfileEntity> = defaultProfiles()
     private var onlineProfiles: Set<String> = emptySet()
+    private var presenceLastSeenMillis: Map<String, Long> = emptyMap()
     private var cloudProfiles: Set<String> = emptySet()
     private var lastRenderedCallTranscript = ""
     private var callTranscriptTextView: TextView? = null
@@ -176,6 +177,10 @@ class MainActivity : Activity() {
             },
             onPresence = { presences ->
                 activityScope.launch(Dispatchers.Main) {
+                    presenceLastSeenMillis = presences
+                        .filter { it.profile.startsWith("@") && it.lastSeenMillis > 0L }
+                        .groupBy { it.profile.lowercase() }
+                        .mapValues { (_, values) -> values.maxOf { it.lastSeenMillis } }
                     onlineProfiles = presences
                         .filter { System.currentTimeMillis() - it.lastSeenMillis <= ONLINE_WINDOW_MS }
                         .map { it.profile }
@@ -439,20 +444,25 @@ class MainActivity : Activity() {
         collabUserRow.addView(compactChip("Users ${registeredUsers.size}", false, COLOR_OBSIDIAN).apply {
             setOnClickListener { showUserManagementDialog() }
         })
-        registeredUsers.forEach { user ->
-            val isOnline = onlineUsers.any { it.equals(user, ignoreCase = true) }
+        val liveUsers = onlineUsers
+            .filter { user -> !user.equals(activeCollabUser, ignoreCase = true) }
+            .ifEmpty { emptyList() }
+        if (liveUsers.isEmpty()) {
+            collabUserRow.addView(compactChip("No live users", false, COLOR_MUTED))
+        }
+        liveUsers.forEach { user ->
             if (user.equals(activeCollabUser, ignoreCase = true)) {
                 collabUserRow.addView(chip(user.removePrefix("@"), true, COLOR_OBSIDIAN).apply {
                     setOnClickListener { showLockedProfileDialog() }
                 })
             } else {
-                collabUserRow.addView(chatUserPill(user, online = isOnline, selected = activeChatPeer == user))
+                collabUserRow.addView(chatUserPill(user, online = true, selected = activeChatPeer == user))
             }
         }
     }
 
     private fun knownCollabUsers(): List<String> {
-        return (onlineProfiles + cloudProfiles + profiles.map { it.mention } + activeCollabUser)
+        return (onlineProfiles + cloudProfiles + presenceLastSeenMillis.keys + profiles.map { it.mention } + activeCollabUser)
             .map { it.trim().lowercase() }
             .filter { it.startsWith("@") }
             .distinct()
@@ -2564,9 +2574,9 @@ class MainActivity : Activity() {
             setTextColor(COLOR_OBSIDIAN)
             setPadding(0, 0, 0, dp(8))
         })
-        content.addView(userManagementSection("Active now", activeUsers, online = true))
+        content.addView(userManagementSection("Live now", activeUsers, online = true))
         val offlineUsers = users.filterNot { activeUsers.any { active -> active.equals(it, ignoreCase = true) } }
-        content.addView(userManagementSection("Registered", offlineUsers, online = false))
+        content.addView(userManagementSection("Recent offline", offlineUsers, online = false))
         AlertDialog.Builder(this)
             .setTitle("User management")
             .setView(content)
@@ -2634,13 +2644,26 @@ class MainActivity : Activity() {
         row.addView(TextView(this).apply {
             text = when {
                 profile.equals(activeCollabUser, ignoreCase = true) -> "me"
-                online -> "online"
-                else -> "offline"
+                online -> "live"
+                else -> lastActiveLabel(profile)
             }
             textSize = 12f
             setTextColor(if (online) COLOR_ACCENT_GREEN else COLOR_MUTED)
         })
         return row
+    }
+
+    private fun lastActiveLabel(profile: String): String {
+        val lastSeen = presenceLastSeenMillis[profile.lowercase()] ?: return "not seen"
+        val elapsed = (System.currentTimeMillis() - lastSeen).coerceAtLeast(0L)
+        val minutes = elapsed / 60_000L
+        val hours = minutes / 60L
+        return when {
+            minutes < 1L -> "just now"
+            minutes < 60L -> "${minutes}m ago"
+            hours < 24L -> "${hours}h ago"
+            else -> "${hours / 24L}d ago"
+        }
     }
 
     private fun showProfileDialog(force: Boolean) {
