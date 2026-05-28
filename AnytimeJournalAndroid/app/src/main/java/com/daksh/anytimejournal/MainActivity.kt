@@ -435,19 +435,31 @@ class MainActivity : Activity() {
         collabUserRow.removeAllViews()
         updateCollabHeader()
         val onlineUsers = collabUiController.visibleOnlineUsers(activeCollabUser, onlineProfiles)
-        if (onlineUsers.isEmpty()) {
-            collabUserRow.addView(chip("No one online", false, COLOR_MUTED))
-            return
-        }
-        onlineUsers.forEach { user ->
+        val registeredUsers = knownCollabUsers()
+        collabUserRow.addView(compactChip("Users ${registeredUsers.size}", false, COLOR_OBSIDIAN).apply {
+            setOnClickListener { showUserManagementDialog() }
+        })
+        registeredUsers.forEach { user ->
+            val isOnline = onlineUsers.any { it.equals(user, ignoreCase = true) }
             if (user.equals(activeCollabUser, ignoreCase = true)) {
                 collabUserRow.addView(chip(user.removePrefix("@"), true, COLOR_OBSIDIAN).apply {
                     setOnClickListener { showLockedProfileDialog() }
                 })
             } else {
-                collabUserRow.addView(chatUserPill(user, online = true, selected = activeChatPeer == user))
+                collabUserRow.addView(chatUserPill(user, online = isOnline, selected = activeChatPeer == user))
             }
         }
+    }
+
+    private fun knownCollabUsers(): List<String> {
+        return (onlineProfiles + cloudProfiles + profiles.map { it.mention } + activeCollabUser)
+            .map { it.trim().lowercase() }
+            .filter { it.startsWith("@") }
+            .distinct()
+            .sortedWith(compareByDescending<String> { profile ->
+                profile.equals(activeCollabUser, ignoreCase = true) ||
+                    onlineProfiles.any { it.equals(profile, ignoreCase = true) }
+            }.thenBy { it })
     }
 
     private fun buildCapturePanel(): View {
@@ -2533,6 +2545,102 @@ class MainActivity : Activity() {
             .setMessage("This username is registered to this device. Live users appear in the chat list.")
             .setPositiveButton("OK", null)
             .show()
+    }
+
+    private fun showUserManagementDialog() {
+        val users = knownCollabUsers()
+        val activeUsers = users.filter { user ->
+            onlineProfiles.any { it.equals(user, ignoreCase = true) } ||
+                user.equals(activeCollabUser, ignoreCase = true)
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), dp(2), dp(4), 0)
+        }
+        content.addView(TextView(this).apply {
+            text = "This device: $activeCollabUser"
+            textSize = 13f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(COLOR_OBSIDIAN)
+            setPadding(0, 0, 0, dp(8))
+        })
+        content.addView(userManagementSection("Active now", activeUsers, online = true))
+        val offlineUsers = users.filterNot { activeUsers.any { active -> active.equals(it, ignoreCase = true) } }
+        content.addView(userManagementSection("Registered", offlineUsers, online = false))
+        AlertDialog.Builder(this)
+            .setTitle("User management")
+            .setView(content)
+            .setNegativeButton("Change me") { _, _ -> showProfileDialog(force = true) }
+            .setPositiveButton("Done", null)
+            .show()
+    }
+
+    private fun userManagementSection(title: String, users: List<String>, online: Boolean): View {
+        val section = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 0, 0, dp(8))
+        }
+        section.addView(TextView(this).apply {
+            text = "$title (${users.size})"
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(COLOR_MUTED)
+            setPadding(0, 0, 0, dp(5))
+        })
+        if (users.isEmpty()) {
+            section.addView(TextView(this).apply {
+                text = "None"
+                textSize = 13f
+                setTextColor(COLOR_MUTED)
+                setPadding(dp(2), 0, 0, dp(5))
+            })
+            return section
+        }
+        users.forEach { user ->
+            section.addView(userManagementRow(user, online))
+        }
+        return section
+    }
+
+    private fun userManagementRow(profile: String, online: Boolean): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(9), dp(7), dp(9), dp(7))
+            background = rounded(Color.WHITE, dp(9), COLOR_LINE, 1)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(5)
+            }
+            setOnClickListener {
+                if (!profile.equals(activeCollabUser, ignoreCase = true)) {
+                    selectCollabPeer(profile)
+                }
+            }
+        }
+        row.addView(View(this).apply {
+            background = rounded(if (online) COLOR_ACCENT_GREEN else COLOR_MUTED, dp(4), Color.TRANSPARENT, 0)
+        }, LinearLayout.LayoutParams(dp(8), dp(8)).apply {
+            rightMargin = dp(8)
+        })
+        row.addView(TextView(this).apply {
+            text = profile
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(COLOR_INK)
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        row.addView(TextView(this).apply {
+            text = when {
+                profile.equals(activeCollabUser, ignoreCase = true) -> "me"
+                online -> "online"
+                else -> "offline"
+            }
+            textSize = 12f
+            setTextColor(if (online) COLOR_ACCENT_GREEN else COLOR_MUTED)
+        })
+        return row
     }
 
     private fun showProfileDialog(force: Boolean) {
